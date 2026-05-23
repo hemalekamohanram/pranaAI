@@ -1,0 +1,11 @@
+{
+  "name": "PranaAI",
+  "description": "A live, real-time AI Yoga Teacher utilizing the Gemini Multimodal Live API to capture your audio and camera feed for instant postural alignment guidelines.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
