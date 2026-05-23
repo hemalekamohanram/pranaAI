@@ -50,12 +50,16 @@ wss.on("connection", async (clientWs, request) => {
     // Read optional configurations passed by client query params
     const model = url.searchParams.get("model") || "gemini-3.1-flash-live-preview"; // Let us use gemini-3.1-flash-live-preview or gemini-2.5-flash as core
     const voice = url.searchParams.get("voice") || "Puck";
+    const practice = url.searchParams.get("practice") || "Vinyasa Flow";
+    const duration = url.searchParams.get("duration") || "20 Minutes";
     
     // Create the isolated yoga session
     await createYogaAgentSession({
       clientWs,
       modelName: model,
       voiceName: voice,
+      practiceType: practice,
+      practiceDuration: duration,
     });
   } else {
     clientWs.close(4004, "Not Found");

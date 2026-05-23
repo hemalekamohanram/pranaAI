@@ -97,6 +97,8 @@ interface CreateYogaAgentSessionOptions {
   modelName?: string;
   systemInstruction?: string;
   voiceName?: string;
+  practiceType?: string;
+  practiceDuration?: string;
 }
 
 /**
@@ -107,11 +109,23 @@ interface CreateYogaAgentSessionOptions {
 export async function createYogaAgentSession({
   clientWs,
   modelName = "gemini-2.5-flash",
-  systemInstruction = "You are an elite, highly encouraging Vinyasa Yoga Instructor. Your job is to watch the user's camera stream, listen to their live spoken questions, and provide immediate conversational guidance.\n\nLive Interaction Protocol: If the user speaks or asks a question mid-pose (e.g., 'Am I doing this right?', 'Where should my foot be?', or 'I feel off balance'), you must immediately abort your current general routine instruction, evaluate their active camera frame, and answer their question directly based on their real-world posture alignment.\n\nPacing & Silence Safeguards: Guide the flow step-by-step. Deliver exactly one posture instruction at a time. After delivering an instruction, state 'Holding here for three deep breaths...' and stop talking entirely. Let the user hold the pose in peace unless their posture breaks.\n\nCorrection Boundaries: Keep all spoken answers shorter than 15 words. Yoga demands focus. If the user wobbles, remind them to find a steady focal point. If their front knee tracks past their ankle in lunges, tell them to slide their foot forward to protect the joint. If their shoulders are hunched, tell them to roll their shoulders down away from their ears.",
-  voiceName = "Puck"
+  systemInstruction,
+  voiceName = "Puck",
+  practiceType = "Vinyasa Flow",
+  practiceDuration = "20 Minutes"
 }: CreateYogaAgentSessionOptions) {
   
-  console.log(`[YogaAgent] Initiating live handshake with Gemini model: ${modelName}`);
+  const finalSystemInstruction = systemInstruction || `You are an elite, highly encouraging, warm, soothing, and kind ${practiceType} Yoga Instructor. Your job is to watch the user's camera stream, listen to their live spoken questions, and provide immediate conversational guidance for their ${practiceDuration} practice.
+
+Live Interaction Protocol: If the user speaks or asks a question mid-pose (e.g., 'Am I doing this right?', 'Where should my foot be?', or 'I feel off balance'), you must immediately abort your current general routine instruction, evaluate their active camera frame, and answer their question directly based on their real-world posture alignment.
+
+Camera Validation: Explicitly confirm to the user during training that you can see them when their camera is operating, and remind them that keeping their full body in view of the frame is necessary for postural correction.
+
+Pacing & Silence Safeguards: Guide the flow step-by-step. Deliver exactly one posture instruction at a time. After delivering an instruction, state 'Holding here for three deep breaths...' and stop talking entirely. Let the user hold the pose in peace unless their posture breaks.
+
+Correction Boundaries: Keep all spoken answers shorter than 15 words. Yoga demands focus. If the user wobbles, remind them to find a steady focal point. If their front knee tracks past their ankle in lunges, tell them to slide their foot forward to protect the joint. If their shoulders are hunched, tell them to roll their shoulders down away from their ears.`;
+
+  console.log(`[YogaAgent] Initiating live handshake with Gemini model: ${modelName} for practice: ${practiceType} (${practiceDuration})`);
   
   if (!process.env.GEMINI_API_KEY) {
     const errMsg = "GEMINI_API_KEY is not defined in the server environment.";
@@ -132,7 +146,7 @@ export async function createYogaAgentSession({
           clientWs.send(JSON.stringify({ type: "status", status: "connected" }));
         },
         onclose: (event: any) => {
-          console.log("[YogaAgent] Gemini Live connection closed:", event);
+          console.log(`[YogaAgent] Gemini Live connection closed (code: ${event?.code || "none"}, reason: ${event?.reason || "none"})`);
           clientWs.send(JSON.stringify({ type: "status", status: "disconnected" }));
         },
         onerror: (err: any) => {
@@ -173,7 +187,7 @@ export async function createYogaAgentSession({
       },
       config: {
         responseModalities: ["AUDIO"],
-        systemInstruction,
+        systemInstruction: finalSystemInstruction,
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: {
@@ -191,6 +205,26 @@ export async function createYogaAgentSession({
     console.error("[YogaAgent] Failed to establish Gemini Live connection:", errMessage);
     clientWs.send(JSON.stringify({ type: "error", error: `Handshake failed: ${errMessage}` }));
     return;
+  }
+
+  // Automatically trigger the soothing welcoming voice introduction
+  try {
+    if (session) {
+      console.log("[YogaAgent] Sending automatic welcome user turn to Gemini Live...");
+      session.send({
+        clientContent: {
+          turns: [{
+            role: "user",
+            parts: [{
+              text: `Hello! Give a professional, extremely calm, soothing, kind, and warm welcome introduction. Welcome me to my ${practiceDuration} session of ${practiceType} Yoga. Confirm that you can see my video stream if it is active, remind me to check that my camera is turned on, and ask me to stand back 6-8 feet to align my posture to begin. Keep it meditative, kind, and under 50 words.`
+            }]
+          }],
+          turnComplete: true
+        }
+      });
+    }
+  } catch (introError) {
+    console.warn("[YogaAgent] Failed to send automatic intro greeting:", introError);
   }
 
   // Handle messages arriving FROM the browser client
